@@ -1,0 +1,11 @@
+{
+  "name": "ultralord-challenge-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:amidf/ultralord-challenge-bot",
+  "author": "Dima Fedin <dima.groot.04@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "telegraf": "^3.35.0"
+  }
+}
