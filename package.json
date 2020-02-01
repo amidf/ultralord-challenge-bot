@@ -6,7 +6,8 @@
   "author": "Dima Fedin <dima.groot.04@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "yarn:prod": "node src/index.js"
+    "start:prod": "node src/index.js",
+    "start:dev": "node src/index.js"
   },
   "dependencies": {
     "telegraf": "^3.35.0"
