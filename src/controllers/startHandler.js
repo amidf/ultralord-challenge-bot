@@ -1,13 +1,14 @@
 const { getDataFromDB, setDataFromDB, logError } = require("../utils");
-const { USERS_WITH_SPEC_ROLES } = require("../constants");
+const { USERS_WITH_SPEC_ROLES, ROLES } = require("../constants");
 
-const getHelloMessage = user => `Привет, @${user.username}`;
+const getHelloMessage = user =>
+  `Привет, @${user.username}. Введи /menu, чтобы открыть главное меню.`;
 
 const getNewUser = user => {
   const newUser = {
     ...user,
     ...(USERS_WITH_SPEC_ROLES[user.username] || {
-      kingdoms: 0,
+      kingdoms: 10,
       role: ROLES.USER
     }),
     wins: 0,
@@ -24,16 +25,22 @@ const startHandler = async ctx => {
     const currentUser = data.users.find(user => user.id === chat.id);
 
     if (!currentUser) {
-      const newUsers = [...data.users, getNewUser(chat)];
+      const newUser = getNewUser(chat);
+
+      const newUsers = [...data.users, newUser];
       const newData = { ...data, users: newUsers };
       setDataFromDB(newData);
+
+      ctx.session.currentUser = newUser;
+    } else {
+      ctx.session.currentUser = currentUser;
     }
 
     ctx.scene.leave();
 
-    return getHelloMessage(chat);
+    return ctx.reply(getHelloMessage(chat));
   } catch (e) {
-    return "Возникла ошибка. Попробуйте позже.";
+    logError(e, ctx);
   }
 };
 

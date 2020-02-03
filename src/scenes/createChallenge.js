@@ -2,7 +2,13 @@ const Scene = require("telegraf/scenes/base");
 const Markup = require("telegraf/markup");
 const uuid = require("uuid");
 
-const { getDataFromDB, setDataFromDB, isBetValid } = require("../utils");
+const {
+  getDataFromDB,
+  setDataFromDB,
+  isBetValid,
+  logError,
+  getCurrentUser
+} = require("../utils");
 
 const defaultInlineKeyboard = Markup.inlineKeyboard([
   Markup.callbackButton("выйти из меню создания...", "leaveScene")
@@ -16,123 +22,141 @@ const creatorChoiceInlineKeyboard = Markup.inlineKeyboard([
 
 const createChallenge = new Scene("createChallenge");
 
-createChallenge.enter(async ctx => {
-  const chat = await ctx.getChat();
-  const { users } = getDataFromDB();
-  const currentUser = users.find(user => user.id === chat.id);
-
-  ctx.scene.state = {
-    currentUser,
-    newChallenge: {
-      name: null,
-      sides: {
-        yes: [],
-        no: []
-      },
-      creatorBet: null,
-      isCreated: false
-    }
-  };
-
-  return ctx.reply(
-    `О чём спор? Например, Ника пойдёт завтра в колледж. Лучше, чтобы на название можно было однозначно ответить либо "да", либо "нет"`,
-    defaultInlineKeyboard
-  );
-});
-
-createChallenge.on("text", ctx => {
-  const { newChallenge, currentUser } = ctx.scene.state;
-
-  if (newChallenge.name === null) {
-    ctx.scene.state.newChallenge.name = ctx.update.message.text;
+createChallenge.enter(ctx => {
+  try {
+    ctx.scene.state = {
+      newChallenge: {
+        name: null,
+        sides: {
+          yes: [],
+          no: []
+        },
+        creatorBet: null,
+        isCreated: false
+      }
+    };
 
     return ctx.reply(
-      `Введите, сколько царств из ${currentUser.kingdoms} вы готовы поставить?`,
+      `О чём спор? Например, Ника пойдёт завтра в колледж. Лучше, чтобы на название можно было однозначно ответить либо "да", либо "нет"`,
       defaultInlineKeyboard
     );
+  } catch (e) {
+    logError(e, ctx);
   }
+});
 
-  if (newChallenge.creatorBet === null) {
-    const value = ctx.update.message.text;
+createChallenge.on("text", async ctx => {
+  try {
+    const { newChallenge } = ctx.scene.state;
+    const chat = await ctx.getChat();
+    const currentUser = getCurrentUser(chat);
 
-    if (isBetValid(value, ctx)) {
-      ctx.scene.state.newChallenge.creatorBet = Math.ceil(+value);
+    if (newChallenge.name === null) {
+      ctx.scene.state.newChallenge.name = ctx.update.message.text;
 
       return ctx.reply(
-        "Теперь выберите свою сторону в этом споре.",
-        creatorChoiceInlineKeyboard
+        `Введите, сколько царств из ${currentUser.kingdoms} вы готовы поставить?`,
+        defaultInlineKeyboard
       );
     }
 
-    return ctx.reply("Введите корректное значение!", defaultInlineKeyboard);
+    if (newChallenge.creatorBet === null) {
+      const value = ctx.update.message.text;
+
+      if (isBetValid(value, currentUser)) {
+        ctx.scene.state.newChallenge.creatorBet = Math.ceil(+value);
+
+        return ctx.reply(
+          "Теперь выберите свою сторону в этом споре.",
+          creatorChoiceInlineKeyboard
+        );
+      }
+
+      return ctx.reply("Введите корректное значение!", defaultInlineKeyboard);
+    }
+  } catch (e) {
+    logError(e, ctx);
   }
 });
 
-createChallenge.action("selectYes", ctx => {
-  const { currentUser, newChallenge } = ctx.scene.state;
+createChallenge.action("selectYes", async ctx => {
+  try {
+    const { newChallenge } = ctx.scene.state;
+    const chat = await ctx.getChat();
+    const currentUser = getCurrentUser(chat);
 
-  ctx.scene.state.newChallenge.sides.yes = [
-    {
-      id: currentUser.id,
-      username: currentUser.username,
-      bet: newChallenge.creatorBet
-    }
-  ];
-  ctx.scene.state.newChallenge.isCreated = true;
-  ctx.answerCbQuery('Выбрано "Да"');
+    ctx.scene.state.newChallenge.sides.yes = [
+      {
+        id: currentUser.id,
+        username: currentUser.username,
+        bet: newChallenge.creatorBet
+      }
+    ];
+    ctx.scene.state.newChallenge.isCreated = true;
+    ctx.answerCbQuery('Выбрано "Да"');
 
-  return ctx.scene.leave();
+    return ctx.scene.leave();
+  } catch (e) {
+    logError(e, ctx);
+  }
 });
 
-createChallenge.action("selectNo", ctx => {
-  const { currentUser, newChallenge } = ctx.scene.state;
+createChallenge.action("selectNo", async ctx => {
+  try {
+    const { newChallenge } = ctx.scene.state;
+    const chat = await ctx.getChat();
+    const currentUser = getCurrentUser(chat);
 
-  ctx.scene.state.newChallenge.sides.no = [
-    {
-      id: currentUser.id,
-      username: currentUser.username,
-      bet: newChallenge.creatorBet
-    }
-  ];
-  ctx.scene.state.newChallenge.isCreated = true;
-  ctx.answerCbQuery('Выбрано "Нет"');
+    ctx.scene.state.newChallenge.sides.no = [
+      {
+        id: currentUser.id,
+        username: currentUser.username,
+        bet: newChallenge.creatorBet
+      }
+    ];
+    ctx.scene.state.newChallenge.isCreated = true;
+    ctx.answerCbQuery('Выбрано "Нет"');
 
-  return ctx.scene.leave();
+    return ctx.scene.leave();
+  } catch (e) {
+    logError(e, ctx);
+  }
 });
 
-createChallenge.leave(ctx => {
-  if (!ctx.scene.state.newChallenge.isCreated) {
-    ctx.scene.state = {};
+createChallenge.leave(async ctx => {
+  try {
+    if (!ctx.scene.state.newChallenge.isCreated) {
+      return ctx.reply(
+        "Отмена создания спора. Введите /menu, чтобы вывести главное меню."
+      );
+    }
 
-    return ctx.reply(
-      "Отмена создания спора. Введите /menu, чтобы вывести главное меню."
+    const { newChallenge } = ctx.scene.state;
+    const chat = await ctx.getChat();
+    const currentUser = getCurrentUser(chat);
+    const data = getDataFromDB();
+    const newActiveChallenge = {
+      id: uuid().slice(0, 8),
+      name: newChallenge.name,
+      sides: newChallenge.sides,
+      creatorId: currentUser.id,
+      createdTime: new Date().toISOString()
+    };
+    const newUsers = data.users.map(user =>
+      currentUser.id === user.id
+        ? {
+            ...user,
+            kingdoms: user.kingdoms - newChallenge.creatorBet
+          }
+        : user
     );
-  }
 
-  const { currentUser } = ctx.scene.state;
-  const data = getDataFromDB();
-  const newChallenge = {
-    id: uuid().slice(0, 8),
-    name: ctx.scene.state.newChallenge.name,
-    sides: ctx.scene.state.newChallenge.sides,
-    creatorId: currentUser.id,
-    createdTime: new Date().toISOString()
-  };
-  const newUsers = data.users.map(user =>
-    currentUser.id === user.id
-      ? {
-          ...user,
-          kingdoms: user.kingdoms - ctx.scene.state.newChallenge.creatorBet
-        }
-      : user
-  );
+    const newActiveChallenges = [...data.activeChallenges, newActiveChallenge];
+    const newData = { users: newUsers, activeChallenges: newActiveChallenges };
 
-  const newActiveChallenges = [...data.activeChallenges, newChallenge];
-  const newData = { users: newUsers, activeChallenges: newActiveChallenges };
+    setDataFromDB(newData);
 
-  setDataFromDB(newData);
-
-  return ctx.reply(`
+    return ctx.reply(`
 Вы создали спор: ${newChallenge.name}.
 
 Сторона "Да":
@@ -141,8 +165,11 @@ ${newChallenge.sides.yes.map(user => `@${user.username}`).join("\n")}
 Сторона "Нет":
 ${newChallenge.sides.no.map(user => `@${user.username}`).join("\n")}
 
-За победу вы получите ${ctx.scene.state.newChallenge.creatorBet * 2} царств.
-`);
+За победу вы получите ${newChallenge.creatorBet * 2} царств.
+  `);
+  } catch (e) {
+    logError(e, ctx);
+  }
 });
 
 module.exports = createChallenge;

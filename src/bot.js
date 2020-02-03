@@ -1,11 +1,9 @@
 const Telegraf = require("telegraf");
-const Markup = require("telegraf/markup");
-const Extra = require("telegraf/extra");
 const session = require("telegraf/session");
 
 const { ACCESS_TOKEN, PORT, URL, IS_PRODUCTION } = require("./constants");
-const logHandler = require("./controllers/logHandler");
 const mainMenu = require("./menus/main");
+const startHandler = require("./controllers/startHandler");
 const stage = require("./scenes");
 
 const bot = new Telegraf(ACCESS_TOKEN);
@@ -15,7 +13,9 @@ if (IS_PRODUCTION) {
   bot.startWebhook(`/bot${ACCESS_TOKEN}`, null, PORT);
 }
 
-bot.use(logHandler);
+bot.catch((err, ctx) => {
+  console.log(`Error: ${ctx.updateType}`, err);
+});
 
 bot.use(session());
 
@@ -25,6 +25,8 @@ bot.action("leaveScene", ctx => {
   ctx.scene.leave();
   return ctx.answerCbQuery();
 });
+
+bot.start(startHandler);
 
 bot.use(
   mainMenu.init({

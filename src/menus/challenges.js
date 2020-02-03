@@ -8,7 +8,7 @@ const challengesMenu = new TelegrafInlineMenu("Выберите действие
 challengesMenu.simpleButton("Создать спор", "createChallenge", {
   doFunc: ctx => {
     ctx.scene.enter("createChallenge");
-    ctx.answerCbQuery();
+    return ctx.answerCbQuery();
   }
 });
 

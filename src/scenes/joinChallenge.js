@@ -1,7 +1,13 @@
 const Scene = require("telegraf/scenes/base");
 const Markup = require("telegraf/markup");
 
-const { getDataFromDB, setDataFromDB, isBetValid } = require("../utils");
+const {
+  getDataFromDB,
+  setDataFromDB,
+  isBetValid,
+  logError,
+  getCurrentUser
+} = require("../utils");
 
 const defaultInlineKeyboard = Markup.inlineKeyboard([
   Markup.callbackButton("выйти...", "leaveScene")
@@ -16,102 +22,120 @@ const creatorChoiceInlineKeyboard = Markup.inlineKeyboard([
 const joinChallenge = new Scene("joinChallenge");
 
 joinChallenge.enter(async ctx => {
-  const chat = await ctx.getChat();
-  const { users } = getDataFromDB();
-  const currentUser = users.find(user => user.id === chat.id);
+  try {
+    const chat = await ctx.getChat();
+    const currentUser = getCurrentUser(chat);
 
-  ctx.scene.state = {
-    joinChallenge: { bet: null, choice: null, isJoined: false },
-    currentUser
-  };
+    ctx.scene.state = {
+      joinChallenge: { bet: null, choice: null, isJoined: false }
+    };
 
-  return ctx.reply(
-    `Введите сколько из ${currentUser.kingdoms} царств вы готовы поставить.`,
-    defaultInlineKeyboard
-  );
+    return ctx.reply(
+      `Введите сколько из ${currentUser.kingdoms} царств вы готовы поставить.`,
+      defaultInlineKeyboard
+    );
+  } catch (e) {
+    logError(e, ctx);
+  }
 });
 
-joinChallenge.on("text", ctx => {
-  if (ctx.scene.state.joinChallenge.bet === null) {
-    const value = ctx.update.message.text;
+joinChallenge.on("text", async ctx => {
+  try {
+    const chat = await ctx.getChat();
+    const currentUser = getCurrentUser(chat);
 
-    if (isBetValid(value, ctx)) {
-      ctx.scene.state.joinChallenge.bet = Math.ceil(+value);
+    if (ctx.scene.state.joinChallenge.bet === null) {
+      const value = ctx.update.message.text;
 
-      return ctx.reply(
-        "Теперь выберите свою сторону в этом споре.",
-        creatorChoiceInlineKeyboard
-      );
+      if (isBetValid(value, currentUser)) {
+        ctx.scene.state.joinChallenge.bet = Math.ceil(+value);
+
+        return ctx.reply(
+          "Теперь выберите свою сторону в этом споре.",
+          creatorChoiceInlineKeyboard
+        );
+      }
+
+      return ctx.reply("Введите корректное значение?", defaultInlineKeyboard);
     }
-
-    return ctx.reply("Введите корректное значение?", defaultInlineKeyboard);
+  } catch (e) {
+    logError(e, ctx);
   }
 });
 
 joinChallenge.action("selectYes", ctx => {
-  ctx.scene.state.joinChallenge.choice = "yes";
-  ctx.scene.state.joinChallenge.isJoined = true;
-  ctx.answerCbQuery('Выбрано "Да"');
+  try {
+    ctx.scene.state.joinChallenge.choice = "yes";
+    ctx.scene.state.joinChallenge.isJoined = true;
+    ctx.answerCbQuery('Выбрано "Да"');
+  } catch (e) {
+    logError(e, ctx);
+  }
 
   return ctx.scene.leave();
 });
 
 joinChallenge.action("selectNo", ctx => {
-  ctx.scene.state.joinChallenge.choice = "no";
-  ctx.scene.state.newChallenge.isJoined = true;
-  ctx.answerCbQuery('Выбрано "Нет"');
+  try {
+    ctx.scene.state.joinChallenge.choice = "no";
+    ctx.scene.state.newChallenge.isJoined = true;
+    ctx.answerCbQuery('Выбрано "Нет"');
+  } catch (e) {
+    logError(e, ctx);
+  }
 
   return ctx.scene.leave();
 });
 
-joinChallenge.leave(ctx => {
-  if (!ctx.scene.state.joinChallenge.isJoined) {
-    ctx.scene.state = {};
+joinChallenge.leave(async ctx => {
+  try {
+    if (!ctx.scene.state.joinChallenge.isJoined) {
+      return ctx.reply(
+        "Отмена присоединения к спору. Введите /menu, чтобы вывести главное меню."
+      );
+    }
+
+    const { joinChallenge } = ctx.scene.state;
+    const chat = await ctx.getChat();
+    const currentUser = getCurrentUser(chat);
+    const currentActiveChallenge = ctx.session.selectedChallenge;
+    const { activeChallenges, users } = getDataFromDB();
+
+    const newActiveChallenge = {
+      ...currentActiveChallenge,
+      sides: {
+        ...currentActiveChallenge.sides,
+        [joinChallenge.choice]: [
+          ...currentActiveChallenge.sides[joinChallenge.choice],
+          {
+            id: currentUser.id,
+            username: currentUser.username,
+            bet: joinChallenge.bet
+          }
+        ]
+      }
+    };
+
+    const newActiveChallenges = activeChallenges.map(challenge =>
+      challenge.id === newActiveChallenge.id ? newActiveChallenge : challenge
+    );
+
+    const newUsers = users.map(user =>
+      user.id === currentUser.id
+        ? { ...user, kingdoms: user.kingdoms - joinChallenge.bet }
+        : user
+    );
+
+    const newData = { users: newUsers, activeChallenges: newActiveChallenges };
+
+    setDataFromDB(newData);
 
     return ctx.reply(
-      "Отмена присоединения к спору. Введите /menu, чтобы вывести главное меню."
+      "Вы присоединились к спору. Введите /menu, чтобы вывести главное меню."
     );
+  } catch (e) {
+    logError(e, ctx);
   }
-
-  const { joinChallenge, currentUser } = ctx.scene.state;
-  const currentActiveChallenge = ctx.session.selectedChallenge;
-  const { activeChallenges, users } = getDataFromDB();
-
-  const newActiveChallenge = {
-    ...currentActiveChallenge,
-    sides: {
-      ...currentActiveChallenge.sides,
-      [joinChallenge.choice]: [
-        ...currentActiveChallenge.sides[joinChallenge.choice],
-        {
-          id: currentUser.id,
-          username: currentUser.username,
-          bet: joinChallenge.bet
-        }
-      ]
-    }
-  };
-
-  const newActiveChallenges = activeChallenges.map(challenge =>
-    challenge.id === newActiveChallenge.id ? newActiveChallenge : challenge
-  );
-
-  const newUsers = users.map(user =>
-    user.id === currentUser.id
-      ? { ...user, kingdoms: user.kingdoms - joinChallenge.bet }
-      : user
-  );
-
-  const newData = { users: newUsers, activeChallenges: newActiveChallenges };
-
-  setDataFromDB(newData);
-
-  ctx.session.selectedChallenge = null;
-  ctx.scene.state = {};
-
-  return ctx.reply(
-    "Вы присоединились к спору. Введите /menu, чтобы вывести главное меню."
-  );
 });
 
 module.exports = joinChallenge;

@@ -1,71 +1,88 @@
 const TelegrafInlineMenu = require("telegraf-inline-menu");
-const Moment = require("moment");
 
-const { getDataFromDB, setDataFromDB } = require("../utils");
+const {
+  getDataFromDB,
+  formatChallengeInfo,
+  formatDetailChallengeInfo,
+  logError,
+  getCurrentUser
+} = require("../utils");
 
-const challengesListMenu = new TelegrafInlineMenu(ctx => {
-  const { users, activeChallenges } = getDataFromDB();
-  ctx.session.selectedChallenge = null;
+const filterActiveChallenges = (activeChallenges, currentUser) =>
+  activeChallenges.filter(
+    ({ sides }) =>
+      !sides.yes.find(user => user.id === currentUser.id) &&
+      !sides.no.find(user => user.id === currentUser.id)
+  );
 
-  return activeChallenges.length === 0
-    ? "На данный момент никто не спорит."
-    : `
+const challengesListMenu = new TelegrafInlineMenu(async ctx => {
+  try {
+    const { activeChallenges } = getDataFromDB();
+    const chat = await ctx.getChat();
+    const currentUser = getCurrentUser(chat);
+
+    const filteredActiveChallenges = filterActiveChallenges(
+      activeChallenges,
+      currentUser
+    );
+
+    ctx.session.selectedChallenge = null;
+
+    return filteredActiveChallenges.length === 0
+      ? "На данный момент никто не спорит."
+      : `
 Список споров:
-${activeChallenges
-  .map(({ name, sides, createdTime, creatorId }, i) => {
-    const author = users.find(user => user.id === creatorId);
-
-    return `
-#${i + 1}: ${name} (${sides.yes.length + sides.no.length} человек)
-Создал @${author.username} ${Moment(createdTime).format("DD/MM/YYYY HH:mm")}
-  `;
-  })
+${filteredActiveChallenges
+  .map((activeChallenge, i) => formatChallengeInfo(activeChallenge, i + 1))
   .join("\n")}
   `;
+  } catch (e) {
+    logError(e, ctx);
+
+    return "ОшибОЧКА.";
+  }
 });
 
 const challengeMenu = new TelegrafInlineMenu(ctx => {
-  const { users, activeChallenges } = getDataFromDB();
-  const currentActiveChallenge = activeChallenges.find(
-    ({ id }) => ctx.match[1] === id
-  );
+  try {
+    const { activeChallenges } = getDataFromDB();
+    const currentActiveChallenge = activeChallenges.find(
+      ({ id }) => ctx.match[1] === id
+    );
 
-  if (!currentActiveChallenge) {
-    return "К сожалению, этого спора больше нет.";
+    if (!currentActiveChallenge) {
+      return "К сожалению, этого спора больше нет.";
+    }
+
+    ctx.session.selectedChallenge = currentActiveChallenge;
+
+    return formatDetailChallengeInfo(currentActiveChallenge);
+  } catch (e) {
+    logError(e, ctx);
+
+    return "ОшибОЧКА.";
   }
-
-  ctx.session.selectedChallenge = currentActiveChallenge;
-
-  return `
-Информация о споре "${currentActiveChallenge.name}"
-
-Создал @${
-    users.find(user => user.id === currentActiveChallenge.creatorId).username
-  }
-Дата создания: ${Moment(currentActiveChallenge.createdTime).format(
-    "DD/MM/YYYY HH:mm"
-  )}
-
-Сторона "Да":
-${currentActiveChallenge.sides.yes.map(user => `@${user.username}`).join("\n")}
-  
-Сторона "Нет":
-${currentActiveChallenge.sides.no.map(user => `@${user.username}`).join("\n")}
-  `;
 });
 
 challengeMenu.simpleButton("Присоединиться", "joinChallenge", {
   doFunc: ctx => {
     ctx.scene.enter("joinChallenge");
+    return ctx.answerCbQuery();
   }
 });
 
 challengesListMenu.selectSubmenu(
   "challenge",
-  () => {
+  async ctx => {
     const { activeChallenges } = getDataFromDB();
+    const chat = await ctx.getChat();
+    const currentUser = getCurrentUser(chat);
+    const filteredActiveChallenges = filterActiveChallenges(
+      activeChallenges,
+      currentUser
+    );
 
-    return activeChallenges.map(challenge => challenge.id);
+    return filteredActiveChallenges.map(activeChallenge => activeChallenge.id);
   },
   challengeMenu,
   {

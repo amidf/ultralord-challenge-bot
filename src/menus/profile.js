@@ -1,7 +1,6 @@
 const TelegrafInlineMenu = require("telegraf-inline-menu");
-const Extra = require("telegraf/extra");
 
-const { getDataFromDB, logError } = require("../utils");
+const { getCurrentUser, logError } = require("../utils");
 const { ROLES } = require("../constants");
 
 const ROLE_MSG = {
@@ -13,8 +12,7 @@ const ROLE_MSG = {
 const profileMenu = new TelegrafInlineMenu(async ctx => {
   try {
     const chat = await ctx.getChat();
-    const { users } = getDataFromDB();
-    const currentUser = users.find(user => user.id === chat.id);
+    const currentUser = getCurrentUser(chat);
 
     if (!currentUser) {
       throw new Error("Пользователя не существует.");

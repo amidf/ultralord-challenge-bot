@@ -1,12 +1,11 @@
 const TelegrafInlineMenu = require("telegraf-inline-menu");
 
-const startHandler = require("../controllers/startHandler");
 const profileMenu = require("./profile");
 const challengesMenu = require("./challenges");
 
-const mainMenu = new TelegrafInlineMenu(startHandler);
+const mainMenu = new TelegrafInlineMenu("Главное меню");
 
-mainMenu.setCommand(["start", "menu"]);
+mainMenu.setCommand("menu");
 
 mainMenu.submenu("Профиль", "profile", profileMenu);
 mainMenu.submenu("Споры", "challenges", challengesMenu);

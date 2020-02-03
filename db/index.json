@@ -1,42 +1,5 @@
 {
-  "users": [
-    {
-      "id": 350369109,
-      "first_name": "Dmitry",
-      "last_name": "Fedin",
-      "username": "fedinamid",
-      "type": "private",
-      "photo": {
-        "small_file_id": "AQADAgADrKcxG1U14hQACM65UQ8ABAIAA1U14hQABAN6bFVTw_f-rwkDAAEYBA",
-        "small_file_unique_id": "AQADzrlRDwAErwkDAAE",
-        "big_file_id": "AQADAgADrKcxG1U14hQACM65UQ8ABAMAA1U14hQABAN6bFVTw_f-sQkDAAEYBA",
-        "big_file_unique_id": "AQADzrlRDwAEsQkDAAE"
-      },
-      "kingdoms": 15,
-      "role": "developer",
-      "wins": 1,
-      "loses": 0
-    }
-  ],
+  "users": [],
   "activeChallenges": [],
-  "closedChallenges": [
-    {
-      "id": "b0fdeaf2",
-      "name": "Ника пойдёт завтра в колледж",
-      "sides": {
-        "yes": [
-          {
-            "id": 350369109,
-            "username": "fedinamid",
-            "bet": 5
-          }
-        ],
-        "no": []
-      },
-      "creatorId": 350369109,
-      "createdTime": "2020-02-03T00:24:14.158Z",
-      "isFinished": true,
-      "result": "yes"
-    }
-  ]
+  "closedChallenges": []
 }
