@@ -6,10 +6,21 @@
   "author": "Dima Fedin <dima.groot.04@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "start:prod": "node src/index.js",
-    "start:dev": "node src/index.js"
+    "start:prod": "node src/index.js --production",
+    "start:dev": "nodemon src/index.js --development"
   },
   "dependencies": {
-    "telegraf": "^3.35.0"
+    "moment": "^2.24.0",
+    "telegraf": "^3.35.0",
+    "telegraf-inline-menu": "^4.0.0",
+    "uuid": "^3.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.2"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "node_modules/*"
+    ]
   }
 }
